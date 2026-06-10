@@ -1,6 +1,7 @@
 "use server";
 
 import OpenAI from "openai";
+import { GoogleGenAI } from "@google/genai";
 
 export interface Supplier {
   id: string;
@@ -24,18 +25,78 @@ export async function searchSuppliers(query: string): Promise<SearchResult> {
     return { category: "", location: "", suppliers: [] };
   }
 
-  const apiKey = process.env.OPENAI_API_KEY;
+  const geminiApiKey = process.env.GEMINI_API_KEY;
+  const openaiApiKey = process.env.OPENAI_API_KEY;
 
-  if (!apiKey) {
-    console.warn("OPENAI_API_KEY is not configured. Falling back to mock data generator.");
-    // Simulate network latency
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    return generateMockSuppliers(cleanQuery);
+  // 1. Try Gemini API if configured
+  if (geminiApiKey) {
+    try {
+      console.log("Using Gemini API for B2B supplier discovery...");
+      const ai = new GoogleGenAI({ apiKey: geminiApiKey });
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: `Act as a B2B supplier discovery engine.
+For the query below:
+${cleanQuery}
+
+Generate supplier information matching the schema:
+{
+  "category": "string",
+  "location": "string",
+  "suppliers": [
+    {
+      "id": "string",
+      "name": "string",
+      "description": "string",
+      "location": "string",
+      "phone": "string",
+      "website": "string",
+      "products": ["string"]
+    }
+  ]
+}
+
+Return exactly 5 suppliers. Make sure they have realistic names, descriptions, locations matching the query, phone numbers, valid-looking websites, and list 3-5 specific products they offer.`,
+        config: {
+          responseMimeType: "application/json",
+        },
+      });
+
+      const text = response.text;
+      if (!text) {
+        throw new Error("Empty response from Gemini");
+      }
+
+      const data = JSON.parse(text) as SearchResult;
+      
+      // Quick validation
+      if (!data.suppliers || !Array.isArray(data.suppliers)) {
+        throw new Error("Invalid response format: 'suppliers' field must be an array");
+      }
+
+      // Ensure IDs exist
+      data.suppliers = data.suppliers.map((s, idx) => ({
+        ...s,
+        id: s.id || `supplier-${idx + 1}`
+      }));
+
+      return data;
+    } catch (error) {
+      console.error("Gemini API Search Error:", error);
+      if (!openaiApiKey) {
+        console.warn("No OpenAI key found. Unable to search with LLMs, falling back to mock.");
+      } else {
+        console.log("Gemini failed. Cascading down to OpenAI...");
+      }
+    }
   }
 
-  try {
-    const openai = new OpenAI({ apiKey });
-    const prompt = `Act as a B2B supplier discovery engine.
+  // 2. Try OpenAI API if configured
+  if (openaiApiKey) {
+    try {
+      console.log("Using OpenAI API for B2B supplier discovery...");
+      const openai = new OpenAI({ apiKey: openaiApiKey });
+      const prompt = `Act as a B2B supplier discovery engine.
 For the query below:
 ${cleanQuery}
 
@@ -61,44 +122,51 @@ Schema:
 
 Return 5 suppliers. Make sure they have realistic names, descriptions, locations matching the query, phone numbers, valid-looking websites, and list 3-5 specific products they offer.`;
 
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content: "You are a helpful assistant that only replies with structured B2B supplier data in raw JSON format. No markdown, no conversational text."
-        },
-        {
-          role: "user",
-          content: prompt
-        }
-      ],
-      response_format: { type: "json_object" }
-    });
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: "You are a helpful assistant that only replies with structured B2B supplier data in raw JSON format. No markdown, no conversational text."
+          },
+          {
+            role: "user",
+            content: prompt
+          }
+        ],
+        response_format: { type: "json_object" }
+      });
 
-    const text = response.choices[0]?.message?.content;
-    if (!text) {
-      throw new Error("Empty response from OpenAI");
+      const text = response.choices[0]?.message?.content;
+      if (!text) {
+        throw new Error("Empty response from OpenAI");
+      }
+
+      const data = JSON.parse(text) as SearchResult;
+      
+      // Quick validation
+      if (!data.suppliers || !Array.isArray(data.suppliers)) {
+        throw new Error("Invalid response format: 'suppliers' field must be an array");
+      }
+
+      // Ensure IDs exist
+      data.suppliers = data.suppliers.map((s, idx) => ({
+        ...s,
+        id: s.id || `supplier-${idx + 1}`
+      }));
+
+      return data;
+    } catch (error) {
+      console.error("OpenAI API Search Error:", error);
+      throw new Error("Unable to fetch supplier information. Please try again.");
     }
-
-    const data = JSON.parse(text) as SearchResult;
-    
-    // Quick validation
-    if (!data.suppliers || !Array.isArray(data.suppliers)) {
-      throw new Error("Invalid response format: 'suppliers' field must be an array");
-    }
-
-    // Ensure IDs exist
-    data.suppliers = data.suppliers.map((s, idx) => ({
-      ...s,
-      id: s.id || `supplier-${idx + 1}`
-    }));
-
-    return data;
-  } catch (error) {
-    console.error("OpenAI API Search Error:", error);
-    throw new Error("Unable to fetch supplier information. Please try again.");
   }
+
+  // 3. Fallback to mock data generator if no API keys are present
+  console.warn("No AI API Keys are configured. Falling back to local mock data generator.");
+  // Simulate network latency
+  await new Promise((resolve) => setTimeout(resolve, 1500));
+  return generateMockSuppliers(cleanQuery);
 }
 
 // Mock generator for offline/unconfigured testing
