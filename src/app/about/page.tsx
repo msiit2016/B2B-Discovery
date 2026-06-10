@@ -1,4 +1,4 @@
-import { Sparkles, Code2, Heart, ArrowRight } from "lucide-react";
+import { Sparkles, Code2, ArrowRight } from "lucide-react";
 import Link from "next/link";
 
 export const metadata = {
@@ -69,7 +69,7 @@ export default function About() {
             <div>
               <h3 className="font-bold text-slate-900 dark:text-white text-base">In-Memory Inquiry Desk</h3>
               <p className="text-slate-500 dark:text-slate-400 text-sm mt-1 leading-relaxed">
-                Buyer requirements are submitted using direct modals and stored temporarily in the server's running process memory, outputting detailed B2B log reports to the console.
+                Buyer requirements are submitted using direct modals and stored temporarily in the server&apos;s running process memory, outputting detailed B2B log reports to the console.
               </p>
             </div>
           </div>

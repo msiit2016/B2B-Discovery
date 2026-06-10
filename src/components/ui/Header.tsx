@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Cpu, Search } from "lucide-react";
+import { Cpu } from "lucide-react";
 
 export default function Header() {
   const pathname = usePathname();

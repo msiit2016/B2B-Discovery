@@ -1,4 +1,3 @@
-import { Shield } from "lucide-react";
 
 export default function SkeletonSupplierCard() {
   return (

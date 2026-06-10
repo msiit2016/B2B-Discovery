@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useTransition } from "react";
+import React, { useState, useEffect, useTransition, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Search, MapPin, ArrowLeft, RefreshCw, AlertCircle, AlertTriangle } from "lucide-react";
 import { searchSuppliers, SearchResult, Supplier } from "@/app/actions/search";
@@ -27,34 +27,37 @@ export default function SearchClient({ initialQuery }: SearchClientProps) {
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const performSearch = async (searchQuery: string) => {
+  const performSearch = useCallback(async (searchQuery: string) => {
     if (!searchQuery.trim()) return;
     
-    setError(null);
-    setResult(null);
-    setActiveQuery(searchQuery);
-
     // Update browser URL query param without refreshing the page
     const params = new URLSearchParams(searchParams.toString());
     params.set("q", searchQuery);
     router.replace(`/search?${params.toString()}`, { scroll: false });
 
     startTransition(async () => {
+      setError(null);
+      setResult(null);
+      setActiveQuery(searchQuery);
       try {
         const data = await searchSuppliers(searchQuery);
         setResult(data);
-      } catch (err: any) {
-        setError(err.message || "Unable to fetch supplier information. Please try again.");
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : "Unable to fetch supplier information. Please try again.";
+        setError(msg);
       }
     });
-  };
+  }, [router, searchParams]);
 
-  // Trigger search on mount if initialQuery is set
+  // Trigger search on mount if initialQuery is set (defer to avoid synchronous setState warning)
   useEffect(() => {
     if (initialQuery) {
-      performSearch(initialQuery);
+      const timer = setTimeout(() => {
+        performSearch(initialQuery);
+      }, 0);
+      return () => clearTimeout(timer);
     }
-  }, [initialQuery]);
+  }, [initialQuery, performSearch]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -147,7 +150,7 @@ export default function SearchClient({ initialQuery }: SearchClientProps) {
             <div>
               <p className="text-sm text-slate-600 dark:text-slate-300 font-medium">
                 Found <span className="font-bold text-indigo-600 dark:text-indigo-400">{result.suppliers.length}</span> suppliers for{" "}
-                <span className="font-bold text-slate-900 dark:text-white">"{activeQuery}"</span>
+                <span className="font-bold text-slate-900 dark:text-white">&ldquo;{activeQuery}&rdquo;</span>
               </p>
               {result.category && result.location && (
                 <div className="flex items-center gap-2 mt-1.5 flex-wrap">
@@ -184,7 +187,7 @@ export default function SearchClient({ initialQuery }: SearchClientProps) {
             <div className="flex flex-col flex-1 items-center justify-center py-16 text-center">
               <h2 className="text-lg font-bold text-slate-900 dark:text-white">No Suppliers Found</h2>
               <p className="max-w-md text-sm text-slate-500 dark:text-slate-400 mt-2">
-                We couldn't find any business listings matches. Try adjusting your query keywords (e.g. products, city, state).
+                We couldn&apos;t find any business listings matches. Try adjusting your query keywords (e.g. products, city, state).
               </p>
             </div>
           )}

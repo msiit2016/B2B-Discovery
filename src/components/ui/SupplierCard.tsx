@@ -1,6 +1,6 @@
 "use client";
 
-import { MapPin, Phone, Globe, Send, ShieldAlert, Award } from "lucide-react";
+import { MapPin, Phone, Globe, Send, Award } from "lucide-react";
 import { Supplier } from "@/app/actions/search";
 
 interface SupplierCardProps {

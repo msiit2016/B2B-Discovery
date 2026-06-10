@@ -77,6 +77,7 @@ export default function InquiryModal({ isOpen, onClose, supplier }: InquiryModal
         toast.error(response.message || "Something went wrong.");
       }
     } catch (err) {
+      console.error("Inquiry submission error:", err);
       toast.error("Failed to submit inquiry. Please try again.");
     } finally {
       setIsSubmitting(false);

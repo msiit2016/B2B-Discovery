@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Search, Sparkles, TrendingUp, HelpCircle } from "lucide-react";
+import { Search, Sparkles, TrendingUp } from "lucide-react";
 
 export default function Home() {
   const [query, setQuery] = useState("");
