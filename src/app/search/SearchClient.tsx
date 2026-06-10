@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useTransition, useCallback } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Search, MapPin, ArrowLeft, RefreshCw, AlertCircle, AlertTriangle } from "lucide-react";
 import { searchSuppliers, SearchResult, Supplier } from "@/app/actions/search";
 import SupplierCard from "@/components/ui/SupplierCard";
@@ -15,7 +15,6 @@ interface SearchClientProps {
 
 export default function SearchClient({ initialQuery }: SearchClientProps) {
   const router = useRouter();
-  const searchParams = useSearchParams();
 
   const [queryInput, setQueryInput] = useState(initialQuery);
   const [activeQuery, setActiveQuery] = useState(initialQuery);
@@ -31,9 +30,12 @@ export default function SearchClient({ initialQuery }: SearchClientProps) {
     if (!searchQuery.trim()) return;
     
     // Update browser URL query param without refreshing the page
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("q", searchQuery);
-    router.replace(`/search?${params.toString()}`, { scroll: false });
+    const currentSearch = typeof window !== "undefined" ? window.location.search : "";
+    const params = new URLSearchParams(currentSearch);
+    if (params.get("q") !== searchQuery) {
+      params.set("q", searchQuery);
+      router.replace(`/search?${params.toString()}`, { scroll: false });
+    }
 
     startTransition(async () => {
       setError(null);
@@ -47,7 +49,7 @@ export default function SearchClient({ initialQuery }: SearchClientProps) {
         setError(msg);
       }
     });
-  }, [router, searchParams]);
+  }, [router]);
 
   // Trigger search on mount if initialQuery is set (defer to avoid synchronous setState warning)
   useEffect(() => {
