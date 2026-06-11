@@ -333,11 +333,20 @@ export default function SearchClient({ initialQuery }: SearchClientProps) {
                 </div>
               )}
             </>
+          ) : isStreaming ? (
+            // Show streaming skeletons while list is empty but stream is active
+            <div className="flex flex-col flex-1">
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3 flex-1 animate-pulse">
+                {Array.from({ length: 6 }).map((_, idx) => (
+                  <SkeletonSupplierCard key={idx} />
+                ))}
+              </div>
+            </div>
           ) : (
             <div className="flex flex-col flex-1 items-center justify-center py-16 text-center">
               <h2 className="text-lg font-bold text-slate-900 dark:text-white">No Suppliers Found</h2>
               <p className="max-w-md text-sm text-slate-500 dark:text-slate-400 mt-2">
-                We couldn&apos;t find any business listings matches. Try adjusting your query keywords (e.g. products, city, state).
+                We couldn&apos;t find any B2B supplier matches. Try adjusting your query keywords (e.g. products, city, state).
               </p>
             </div>
           )}
