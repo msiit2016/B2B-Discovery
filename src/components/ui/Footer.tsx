@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Cpu } from "lucide-react";
+import Image from "next/image";
 
 export default function Footer() {
   return (
@@ -7,15 +7,16 @@ export default function Footer() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
           <div className="flex items-center gap-2">
-            <div className="flex h-6 w-6 items-center justify-center rounded bg-indigo-600 text-white">
-              <Cpu className="h-3.5 w-3.5" />
-            </div>
-            <span className="text-sm font-semibold text-slate-900 dark:text-white">
-              AI Supplier Discovery
-            </span>
+            <Image
+              src="/logo.png"
+              alt="IndiConnect.AI"
+              width={110}
+              height={30}
+              className="h-7 w-auto object-contain"
+            />
           </div>
           <p className="text-center text-xs text-slate-500 dark:text-slate-400">
-            &copy; {new Date().getFullYear()} AI Supplier Discovery. All rights reserved.
+            &copy; {new Date().getFullYear()} IndiConnect.AI. All rights reserved.
           </p>
           <div className="flex gap-4 text-xs text-slate-500 dark:text-slate-400">
             <Link href="/about" className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors duration-200">

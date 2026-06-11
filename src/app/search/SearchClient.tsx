@@ -171,7 +171,7 @@ export default function SearchClient({ initialQuery }: SearchClientProps) {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
             <div>
               <p className="text-sm text-slate-600 dark:text-slate-300 font-medium">
-                Found <span className="font-bold text-indigo-600 dark:text-indigo-400">{totalItems}</span> suppliers for{" "}
+                Found Results for{" "}
                 <span className="font-bold text-slate-900 dark:text-white">&ldquo;{activeQuery}&rdquo;</span>
               </p>
               {result.category && result.location && (

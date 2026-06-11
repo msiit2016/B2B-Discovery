@@ -38,7 +38,7 @@ export default function Home() {
         {/* Sparkle Badge */}
         <div className="inline-flex items-center gap-1.5 rounded-full border border-indigo-200/50 bg-indigo-50/50 px-3.5 py-1.5 text-xs font-semibold text-indigo-700 dark:border-indigo-800/40 dark:bg-indigo-950/30 dark:text-indigo-400 mb-6 transition-all duration-300">
           <Sparkles className="h-4.5 w-4.5 animate-pulse-subtle" />
-          <span>AI-Powered B2B Search Engine</span>
+          <span>India's AI-Powered B2B Search Engine</span>
         </div>
 
         {/* Headline */}

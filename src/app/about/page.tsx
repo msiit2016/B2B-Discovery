@@ -2,8 +2,8 @@ import { Sparkles, Code2, ArrowRight } from "lucide-react";
 import Link from "next/link";
 
 export const metadata = {
-  title: "About Us | AI Supplier Discovery",
-  description: "Learn how AI Supplier Discovery uses AI-powered semantic search and profile synthesis to connect B2B buyers with active industrial suppliers.",
+  title: "About Us | IndiConnect.AI",
+  description: "Learn how IndiConnect.AI uses AI-powered semantic search and profile synthesis to connect B2B buyers with active industrial suppliers across India.",
 };
 
 export default function About() {
@@ -17,10 +17,10 @@ export default function About() {
         {/* Intro */}
         <div className="mb-12">
           <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl text-slate-900 dark:text-white mb-4">
-            About AI Supplier Discovery
+            About IndiConnect.AI
           </h1>
           <p className="text-lg text-slate-600 dark:text-slate-300 leading-relaxed">
-            AI Supplier Discovery is a prototype B2B search application that demonstrates how generative artificial intelligence can synthesize structured business information in real-time.
+            IndiConnect.AI is a B2B search platform that demonstrates how generative artificial intelligence can synthesize structured supplier information in real-time for India's industrial marketplace.
           </p>
         </div>
 
@@ -31,7 +31,7 @@ export default function About() {
             <h2 className="text-xl font-bold text-slate-900 dark:text-white">Our Core Concept</h2>
           </div>
           <p className="text-slate-600 dark:text-slate-300 leading-relaxed">
-            Rather than relying on outdated static supplier directories, AI Supplier Discovery harnesses large language models to construct complete profiles on demand. By parsing search queries semantically, it categorizes products, identifies target locations, and synthesizes 5 active mock/verified entities tailored to standard B2B marketplace schema rules.
+            Rather than relying on outdated static supplier directories, IndiConnect.AI harnesses large language models to construct complete profiles on demand. By parsing search queries semantically, it categorizes products, identifies target locations, and synthesizes active entities tailored to standard B2B marketplace schema rules.
           </p>
         </div>
 

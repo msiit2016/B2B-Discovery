@@ -16,8 +16,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AI Supplier Discovery | Find B2B Suppliers Instantly",
-  description: "Search products, suppliers, or locations to discover relevant B2B businesses instantly using advanced AI-powered data synthesis.",
+  title: "IndiConnect.AI | Find B2B Suppliers Instantly",
+  description: "Search products, suppliers, or locations to discover relevant B2B businesses instantly using IndiConnect.AI — India's AI-powered B2B supplier discovery engine.",
 };
 
 export default function RootLayout({
