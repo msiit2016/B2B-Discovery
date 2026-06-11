@@ -56,7 +56,7 @@ Generate supplier information matching the schema:
   ]
 }
 
-Return exactly 5 suppliers. Make sure they have realistic names, descriptions, locations matching the query, phone numbers, valid-looking websites, and list 3-5 specific products they offer.`,
+Return exactly 30 suppliers. Make sure they have realistic names, descriptions, locations matching the query, phone numbers, valid-looking websites, and list 3-5 specific products they offer.`,
         config: {
           responseMimeType: "application/json",
         },
@@ -120,7 +120,7 @@ Schema:
   ]
 }
 
-Return 5 suppliers. Make sure they have realistic names, descriptions, locations matching the query, phone numbers, valid-looking websites, and list 3-5 specific products they offer.`;
+Return 30 suppliers. Make sure they have realistic names, descriptions, locations matching the query, phone numbers, valid-looking websites, and list 3-5 specific products they offer.`;
 
       const response = await openai.chat.completions.create({
         model: "gpt-4o-mini",
@@ -200,7 +200,7 @@ function generateMockSuppliers(query: string): SearchResult {
   if (detectedLocation) {
     location = detectedLocation;
   } else {
-    // If no city matches, see if we can guess one or just use a default
+    // If no city matches, use default
     location = "Rajasthan";
   }
 
@@ -233,10 +233,20 @@ function generateMockSuppliers(query: string): SearchResult {
     }
   ];
 
-  const suppliers: Supplier[] = supplierTemplates.map((tpl, i) => {
+  const brandPrefixes = [
+    "Royal", "Apex", "Global", "United", "Prime", "Universal",
+    "Super", "Supreme", "National", "Elite", "Bharat", "Vedic",
+    "Sigma", "Zenith", "Dynamic", "Nova", "Everest", "GoldStar",
+    "Matrix", "Quantum", "Pacific", "Atlas", "Omega", "Vanguard",
+    "Crown", "Galaxy", "Imperial", "Legacy", "Pioneer", "Anchor"
+  ];
+
+  const suppliers: Supplier[] = Array.from({ length: 30 }).map((_, idx) => {
+    const tpl = supplierTemplates[idx % supplierTemplates.length];
+    const prefix = brandPrefixes[idx % brandPrefixes.length];
     const baseName = category.split(" ")[0] || "Industrial";
-    const name = `${location} ${baseName} ${tpl.nameSuffix}`;
-    const id = `mock-supplier-${i + 1}`;
+    const name = `${prefix} ${location} ${baseName} ${tpl.nameSuffix}`;
+    const id = `mock-supplier-${idx + 1}`;
     
     // Custom products list
     const specificProducts = tpl.products.map(p => {
@@ -250,9 +260,9 @@ function generateMockSuppliers(query: string): SearchResult {
     return {
       id,
       name,
-      description: tpl.desc,
+      description: `[Result #${idx + 1}] ${tpl.desc}`,
       location: `${location}, India`,
-      phone: `+91 98765 ${43210 - i * 111}`,
+      phone: `+91 98765 ${43210 - idx * 111}`,
       website: `https://www.${name.toLowerCase().replace(/[^a-z0-9]/g, "")}.com`,
       products: specificProducts
     };

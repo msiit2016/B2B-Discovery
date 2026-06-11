@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useTransition, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Search, MapPin, ArrowLeft, RefreshCw, AlertCircle, AlertTriangle } from "lucide-react";
+import { Search, MapPin, ArrowLeft, RefreshCw, AlertCircle, AlertTriangle, ChevronLeft, ChevronRight } from "lucide-react";
 import { searchSuppliers, SearchResult, Supplier } from "@/app/actions/search";
 import SupplierCard from "@/components/ui/SupplierCard";
 import SkeletonSupplierCard from "@/components/ui/SkeletonSupplierCard";
@@ -21,6 +21,10 @@ export default function SearchClient({ initialQuery }: SearchClientProps) {
   const [result, setResult] = useState<SearchResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 6;
 
   // Inquiry Modal State
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
@@ -41,6 +45,7 @@ export default function SearchClient({ initialQuery }: SearchClientProps) {
       setError(null);
       setResult(null);
       setActiveQuery(searchQuery);
+      setCurrentPage(1); // Reset page on new search
       try {
         const data = await searchSuppliers(searchQuery);
         setResult(data);
@@ -70,6 +75,21 @@ export default function SearchClient({ initialQuery }: SearchClientProps) {
     setSelectedSupplier(supplier);
     setIsModalOpen(true);
   };
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 120, behavior: "smooth" });
+    }
+  };
+
+  // Pagination math
+  const totalItems = result?.suppliers.length || 0;
+  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  const paginatedSuppliers = result?.suppliers.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  ) || [];
 
   return (
     <div className="mx-auto max-w-7xl w-full px-4 sm:px-6 lg:px-8 py-8 flex flex-col flex-1">
@@ -117,7 +137,7 @@ export default function SearchClient({ initialQuery }: SearchClientProps) {
         <div className="flex flex-col flex-1">
           <div className="h-4 w-48 bg-slate-200 dark:bg-slate-800 rounded animate-pulse mb-6" />
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3 flex-1">
-            {Array.from({ length: 5 }).map((_, idx) => (
+            {Array.from({ length: 6 }).map((_, idx) => (
               <SkeletonSupplierCard key={idx} />
             ))}
           </div>
@@ -151,7 +171,7 @@ export default function SearchClient({ initialQuery }: SearchClientProps) {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
             <div>
               <p className="text-sm text-slate-600 dark:text-slate-300 font-medium">
-                Found <span className="font-bold text-indigo-600 dark:text-indigo-400">{result.suppliers.length}</span> suppliers for{" "}
+                Found <span className="font-bold text-indigo-600 dark:text-indigo-400">{totalItems}</span> suppliers for{" "}
                 <span className="font-bold text-slate-900 dark:text-white">&ldquo;{activeQuery}&rdquo;</span>
               </p>
               {result.category && result.location && (
@@ -175,16 +195,70 @@ export default function SearchClient({ initialQuery }: SearchClientProps) {
           </div>
 
           {/* Supplier Grid */}
-          {result.suppliers.length > 0 ? (
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {result.suppliers.map((supplier) => (
-                <SupplierCard
-                  key={supplier.id}
-                  supplier={supplier}
-                  onInquiry={handleInquiryOpen}
-                />
-              ))}
-            </div>
+          {paginatedSuppliers.length > 0 ? (
+            <>
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+                {paginatedSuppliers.map((supplier) => (
+                  <SupplierCard
+                    key={supplier.id}
+                    supplier={supplier}
+                    onInquiry={handleInquiryOpen}
+                  />
+                ))}
+              </div>
+
+              {/* Pagination Controls */}
+              {totalPages > 1 && (
+                <div className="mt-10 border-t border-slate-200/60 dark:border-slate-800/80 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <span className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium">
+                    Showing <span className="font-bold text-slate-900 dark:text-white">{Math.min((currentPage - 1) * itemsPerPage + 1, totalItems)}</span> to{" "}
+                    <span className="font-bold text-slate-900 dark:text-white">{Math.min(currentPage * itemsPerPage, totalItems)}</span> of{" "}
+                    <span className="font-bold text-slate-900 dark:text-white">{totalItems}</span> suppliers
+                  </span>
+
+                  <div className="flex items-center gap-1.5">
+                    {/* Previous Button */}
+                    <button
+                      onClick={() => handlePageChange(currentPage - 1)}
+                      disabled={currentPage === 1}
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200/60 bg-white hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-800/40 dark:hover:bg-slate-800 disabled:opacity-40 disabled:hover:bg-white dark:disabled:hover:bg-slate-800/40 text-slate-700 dark:text-slate-200 transition-all cursor-pointer active:scale-95"
+                      title="Previous Page"
+                    >
+                      <ChevronLeft className="h-4.5 w-4.5" />
+                    </button>
+
+                    {/* Page Numbers */}
+                    {Array.from({ length: totalPages }).map((_, i) => {
+                      const pageNumber = i + 1;
+                      const isCurrent = pageNumber === currentPage;
+                      return (
+                        <button
+                          key={pageNumber}
+                          onClick={() => handlePageChange(pageNumber)}
+                          className={`inline-flex h-9 w-9 items-center justify-center rounded-xl text-sm font-semibold transition-all cursor-pointer active:scale-95 ${
+                            isCurrent
+                              ? "bg-indigo-600 text-white shadow-sm"
+                              : "border border-slate-200/60 bg-white hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-800/40 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200"
+                          }`}
+                        >
+                          {pageNumber}
+                        </button>
+                      );
+                    })}
+
+                    {/* Next Button */}
+                    <button
+                      onClick={() => handlePageChange(currentPage + 1)}
+                      disabled={currentPage === totalPages}
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200/60 bg-white hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-800/40 dark:hover:bg-slate-800 disabled:opacity-40 disabled:hover:bg-white dark:disabled:hover:bg-slate-800/40 text-slate-700 dark:text-slate-200 transition-all cursor-pointer active:scale-95"
+                      title="Next Page"
+                    >
+                      <ChevronRight className="h-4.5 w-4.5" />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
           ) : (
             <div className="flex flex-col flex-1 items-center justify-center py-16 text-center">
               <h2 className="text-lg font-bold text-slate-900 dark:text-white">No Suppliers Found</h2>
