@@ -38,14 +38,14 @@ export default function Home() {
         {/* Sparkle Badge */}
         <div className="inline-flex items-center gap-1.5 rounded-full border border-indigo-200/50 bg-indigo-50/50 px-3.5 py-1.5 text-xs font-semibold text-indigo-700 dark:border-indigo-800/40 dark:bg-indigo-950/30 dark:text-indigo-400 mb-6 transition-all duration-300">
           <Sparkles className="h-4.5 w-4.5 animate-pulse-subtle" />
-          <span>India's AI-Powered B2B Search Engine</span>
+          <span>AI-powered supplier intelligence</span>
         </div>
 
         {/* Headline */}
         <h1 className="text-4xl font-extrabold tracking-tight sm:text-6xl text-slate-950 dark:text-white leading-[1.15] mb-4">
           Find Suppliers Using{" "}
           <span className="bg-gradient-to-r from-indigo-600 via-violet-500 to-indigo-500 bg-clip-text text-transparent dark:from-indigo-400 dark:via-violet-400 dark:to-indigo-300">
-            AI Discovery
+            AI
           </span>
         </h1>
 
