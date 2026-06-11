@@ -228,17 +228,33 @@ The JSON object must match this schema:
 function generateMockSuppliers(query: string): SearchResult {
   const queryLower = query.toLowerCase().trim();
   
-  // Extract clean keywords from query
-  const stopWords = ["in", "at", "for", "near", "supplier", "suppliers", "distributor", "distributors", "dealer", "dealers", "manufacturer", "manufacturers", "wholesale", "wholesaler", "wholesalers", "on", "rent", "rental"];
-  const words = queryLower.split(/\s+/).filter(w => w.length > 1 && !stopWords.includes(w));
-  
-  // Try to find a city
-  const cities = ["kota", "jaipur", "delhi", "ahmedabad", "mumbai", "pune", "bangalore", "chennai", "kolkata", "noida", "gurgaon", "hyderabad", "surat"];
+  // Extract location using prepositions
   let location = "";
-  for (const city of cities) {
-    if (queryLower.includes(city)) {
-      location = city.charAt(0).toUpperCase() + city.slice(1);
-      break;
+  const prepositionMatch = query.match(/(?:\bin\b|\bat\b|\bnear\b|\bfrom\b)\s+([a-zA-Z0-9\s]+)/i);
+  if (prepositionMatch) {
+    const rawLocation = prepositionMatch[1].trim();
+    const locStopWords = ["near", "for", "with", "from", "at", "in", "supplier", "suppliers", "dealer", "dealers", "manufacturer", "manufacturers"];
+    const locWords = rawLocation.split(/\s+/);
+    const cleanLocWords = [];
+    for (const word of locWords) {
+      if (locStopWords.includes(word.toLowerCase())) {
+        break;
+      }
+      cleanLocWords.push(word);
+    }
+    if (cleanLocWords.length > 0) {
+      location = cleanLocWords.map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ");
+    }
+  }
+
+  // Fallback to checking cities list if no preposition match
+  if (!location) {
+    const cities = ["kota", "jaipur", "delhi", "ahmedabad", "mumbai", "pune", "bangalore", "chennai", "kolkata", "noida", "gurgaon", "hyderabad", "surat"];
+    for (const city of cities) {
+      if (queryLower.includes(city)) {
+        location = city.charAt(0).toUpperCase() + city.slice(1);
+        break;
+      }
     }
   }
   
@@ -246,19 +262,29 @@ function generateMockSuppliers(query: string): SearchResult {
     location = "India";
   }
 
-  // Determine category/product keywords
-  let categoryKeyword = "";
-  if (words.length > 0) {
-    const nonLocationWords = words.filter(w => w !== location.toLowerCase());
-    if (nonLocationWords.length > 0) {
-      categoryKeyword = nonLocationWords.map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
-    }
-  }
-  if (!categoryKeyword) {
-    categoryKeyword = "Industrial Goods";
+  // Determine category by stripping prepositions & location
+  let cleanQueryForCategory = query;
+  if (prepositionMatch) {
+    cleanQueryForCategory = query.replace(/(?:\bin\b|\bat\b|\bnear\b|\bfrom\b)\s+.*/i, "");
   }
 
-  const category = categoryKeyword;
+  const categoryStopWords = ["supplier", "suppliers", "distributor", "distributors", "dealer", "dealers", "manufacturer", "manufacturers", "wholesale", "wholesaler", "wholesalers", "on", "rent", "rental", "looking", "for", "buy", "find"];
+  const categoryWords = cleanQueryForCategory
+    .split(/\s+/)
+    .filter(w => w.length > 0 && !categoryStopWords.includes(w.toLowerCase()));
+
+  let category = "";
+  if (categoryWords.length > 0) {
+    category = categoryWords.map(w => {
+      const upper = w.toUpperCase();
+      if (["TMT", "FRP", "GI", "MS", "OPC", "PPC", "B2B", "ERW", "PVC", "GRP"].includes(upper)) {
+        return upper;
+      }
+      return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+    }).join(" ");
+  } else {
+    category = "Industrial Supplies";
+  }
 
   const supplierTemplates = [
     {
