@@ -305,7 +305,7 @@ function generateMockSuppliers(query: string): SearchResult {
     return {
       id,
       name,
-      description: `[Result #${idx + 1}] ${tpl.desc}`,
+      description: tpl.desc,
       location: `${location}, India`,
       phone: `+91 98765 ${43210 - idx * 111}`,
       website: `https://www.${name.toLowerCase().replace(/[^a-z0-9]/g, "")}.com`,
