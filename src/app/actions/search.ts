@@ -149,7 +149,7 @@ async function searchWithGemini(query: string, apiKey: string): Promise<SearchRe
   
   const prompt = `Find B2B suppliers matching this query: "${query}".
 You must search for real, live, existing suppliers using Google Search. DO NOT invent details.
-Provide exactly 30 suppliers. If you cannot find 30 real ones from search results, first list all the real ones you found, and then complete the list of 30 by generating highly realistic suppliers based on actual brands and actual market locations in India.
+Provide exactly 30 suppliers. If you cannot find 30 real ones from search results, first list all the real ones you found, and then complete the list of 30 by generating highly realistic suppliers based on actual brands and actual market locations in the target location focus of the query (e.g. China, India, USA, etc.).
 
 Format your entire response as a single valid JSON object. Use markdown code block with \`\`\`json.
 The JSON object must match this schema:
@@ -328,12 +328,36 @@ function generateMockSuppliers(query: string): SearchResult {
     const name = `${prefix} ${location} ${category} ${tpl.nameSuffix}`;
     const id = `mock-supplier-${idx + 1}`;
     
+    let displayLocation = location;
+    const indianCities = ["kota", "jaipur", "delhi", "ahmedabad", "mumbai", "pune", "bangalore", "chennai", "kolkata", "noida", "gurgaon", "hyderabad", "surat"];
+    if (indianCities.includes(location.toLowerCase())) {
+      displayLocation = `${location}, India`;
+    } else if (location.toLowerCase() === "india") {
+      displayLocation = "India";
+    } else {
+      displayLocation = location;
+    }
+
+    let phonePrefix = "+91";
+    const locLower = location.toLowerCase();
+    if (locLower === "china") {
+      phonePrefix = "+86";
+    } else if (locLower === "usa" || locLower === "united states") {
+      phonePrefix = "+1";
+    } else if (locLower === "uk" || locLower === "united kingdom") {
+      phonePrefix = "+44";
+    } else if (locLower === "germany") {
+      phonePrefix = "+49";
+    } else if (locLower === "japan") {
+      phonePrefix = "+81";
+    }
+
     return {
       id,
       name,
       description: tpl.desc,
-      location: `${location}, India`,
-      phone: `+91 98765 ${43210 - idx * 111}`,
+      location: displayLocation,
+      phone: `${phonePrefix} 98765 ${43210 - idx * 111}`,
       website: `https://www.${name.toLowerCase().replace(/[^a-z0-9]/g, "")}.com`,
       products: tpl.products
     };
