@@ -36,62 +36,15 @@ export async function searchSuppliers(query: string): Promise<SearchResult> {
   // 1. Try Gemini API if configured
   if (geminiApiKey) {
     try {
-      console.log("Using Gemini API for B2B supplier discovery...");
-      const ai = new GoogleGenAI({ apiKey: geminiApiKey });
-      const response = await ai.models.generateContent({
-        model: "gemini-1.5-flash",
-        contents: `Act as a B2B supplier discovery engine.
-For the query below:
-${cleanQuery}
-
-Generate supplier information matching the schema:
-{
-  "category": "string",
-  "location": "string",
-  "suppliers": [
-    {
-      "id": "string",
-      "name": "string",
-      "description": "string",
-      "location": "string",
-      "phone": "string",
-      "website": "string",
-      "products": ["string"]
-    }
-  ]
-}
-
-Return exactly 30 suppliers. Make sure they have realistic names, descriptions, locations matching the query, phone numbers, valid-looking websites, and list 3-5 specific products they offer.`,
-        config: {
-          responseMimeType: "application/json",
-        },
-      });
-
-      const text = response.text;
-      if (!text) {
-        throw new Error("Empty response from Gemini");
-      }
-
-      const data = JSON.parse(text) as SearchResult;
-      
-      // Quick validation
-      if (!data.suppliers || !Array.isArray(data.suppliers)) {
-        throw new Error("Invalid response format: 'suppliers' field must be an array");
-      }
-
-      // Ensure IDs exist
-      data.suppliers = data.suppliers.map((s, idx) => ({
-        ...s,
-        id: s.id || `supplier-${idx + 1}`
-      }));
-
+      console.log("Starting Gemini API search with Google Search grounding...");
+      const data = await searchWithGemini(cleanQuery, geminiApiKey);
       return data;
     } catch (error) {
-      console.error("Gemini API Search Error:", error);
+      console.error("All Gemini API attempts failed:", error);
       if (openaiApiKey && openaiApiKey !== "your_openai_api_key_here") {
-        console.log("Gemini failed. Cascading down to OpenAI...");
+        console.log("Cascading down to OpenAI...");
       } else {
-        console.warn("Gemini failed and no valid OpenAI key found. Falling back to mock data.");
+        console.warn("No valid OpenAI key found. Falling back to local dynamic mock data.");
       }
     }
   }
@@ -150,12 +103,10 @@ Return 30 suppliers. Make sure they have realistic names, descriptions, location
 
       const data = JSON.parse(text) as SearchResult;
       
-      // Quick validation
       if (!data.suppliers || !Array.isArray(data.suppliers)) {
         throw new Error("Invalid response format: 'suppliers' field must be an array");
       }
 
-      // Ensure IDs exist
       data.suppliers = data.suppliers.map((s, idx) => ({
         ...s,
         id: s.id || `supplier-${idx + 1}`
@@ -164,78 +115,176 @@ Return 30 suppliers. Make sure they have realistic names, descriptions, location
       return data;
     } catch (error) {
       console.error("OpenAI API Search Error:", error);
-      console.warn("OpenAI also failed. Falling back to mock data.");
+      console.warn("OpenAI also failed. Falling back to local dynamic mock data.");
     }
   }
 
-  // 3. Fallback to mock data generator if no API keys are present
-  console.warn("No AI API Keys are configured. Falling back to local mock data generator.");
+  // 3. Fallback to mock data generator if no API keys are present or all failed
+  console.warn("Falling back to local query-intent-aware mock data generator.");
   // Simulate network latency
   await new Promise((resolve) => setTimeout(resolve, 1500));
   return generateMockSuppliers(cleanQuery);
 }
 
-// Mock generator for offline/unconfigured testing
-function generateMockSuppliers(query: string): SearchResult {
-  const queryLower = query.toLowerCase();
-  
-  // Extract location / category keywords from query
-  let category = "Industrial Goods";
-  let location = "India";
-
-  if (queryLower.includes("tmt bar") || queryLower.includes("tmt")) {
-    category = "TMT Steel Bars";
-  } else if (queryLower.includes("cement")) {
-    category = "Cement & Construction Materials";
-  } else if (queryLower.includes("pipe") || queryLower.includes("steel")) {
-    category = "Steel Pipes & Tubes";
-  } else if (queryLower.includes("frp tank") || queryLower.includes("tank")) {
-    category = "FRP Industrial Tanks";
+// Extract JSON block from LLM markdown response text
+function extractJson(text: string): string {
+  // Try to find markdown code block first
+  const match = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (match) {
+    return match[1].trim();
   }
+  // Fallback: try to find first { and last }
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
+  if (start !== -1 && end !== -1 && end > start) {
+    return text.substring(start, end + 1).trim();
+  }
+  return text.trim();
+}
 
-  // Location detection
-  const cities = ["kota", "jaipur", "delhi", "ahmedabad", "mumbai", "pune", "bangalore", "chennai", "kolkata", "noida", "gurgaon"];
-  let detectedLocation = "";
+// Live search with Gemini with search grounding and retry logic
+async function searchWithGemini(query: string, apiKey: string): Promise<SearchResult> {
+  const ai = new GoogleGenAI({ apiKey });
+  const models = ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash"];
+  
+  const prompt = `Find B2B suppliers matching this query: "${query}".
+You must search for real, live, existing suppliers using Google Search. DO NOT invent details.
+Provide exactly 30 suppliers. If you cannot find 30 real ones from search results, first list all the real ones you found, and then complete the list of 30 by generating highly realistic suppliers based on actual brands and actual market locations in India.
+
+Format your entire response as a single valid JSON object. Use markdown code block with \`\`\`json.
+The JSON object must match this schema:
+{
+  "category": "string",
+  "location": "string",
+  "suppliers": [
+    {
+      "name": "string",
+      "description": "string",
+      "location": "string",
+      "phone": "string",
+      "website": "string",
+      "products": ["string"]
+    }
+  ]
+}`;
+
+  let lastError: any = null;
+
+  for (const model of models) {
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      console.log(`Gemini discovery attempt ${attempt} using model ${model} for query "${query}"...`);
+      try {
+        const response = await ai.models.generateContent({
+          model: model,
+          contents: prompt,
+          config: {
+            tools: [{ googleSearch: {} }],
+          }
+        });
+        
+        const text = response.text;
+        if (!text) {
+          throw new Error("Empty response from Gemini");
+        }
+        
+        const jsonStr = extractJson(text);
+        const data = JSON.parse(jsonStr) as SearchResult;
+        
+        if (!data.suppliers || !Array.isArray(data.suppliers)) {
+          throw new Error("Invalid response format: 'suppliers' field must be an array");
+        }
+        
+        // Ensure standard formatting, IDs, and valid values
+        data.category = data.category || "General B2B";
+        data.location = data.location || "India";
+        data.suppliers = data.suppliers.map((s, idx) => ({
+          id: s.id || `supplier-${idx + 1}`,
+          name: s.name || "Unknown Supplier",
+          description: s.description || `Industrial supplier of ${data.category}`,
+          location: s.location || data.location,
+          phone: s.phone || `+91 98765 ${43210 - idx}`,
+          website: s.website || `https://www.google.com/search?q=${encodeURIComponent(s.name || "supplier")}`,
+          products: Array.isArray(s.products) ? s.products : [data.category]
+        }));
+        
+        console.log(`Successfully retrieved and parsed ${data.suppliers.length} suppliers from Gemini using ${model}`);
+        return data;
+      } catch (error: any) {
+        console.error(`Attempt ${attempt} with model ${model} failed:`, error.message || error);
+        lastError = error;
+        // Wait before retry if not the absolute last attempt
+        if (model !== models[models.length - 1] || attempt < 3) {
+          const waitTime = attempt * 1500;
+          await new Promise((resolve) => setTimeout(resolve, waitTime));
+        }
+      }
+    }
+  }
+  
+  throw lastError || new Error("Gemini API search failed after trying all models");
+}
+
+// Mock generator for offline/unconfigured testing or complete fallback
+function generateMockSuppliers(query: string): SearchResult {
+  const queryLower = query.toLowerCase().trim();
+  
+  // Extract clean keywords from query
+  const stopWords = ["in", "at", "for", "near", "supplier", "suppliers", "distributor", "distributors", "dealer", "dealers", "manufacturer", "manufacturers", "wholesale", "wholesaler", "wholesalers", "on", "rent", "rental"];
+  const words = queryLower.split(/\s+/).filter(w => w.length > 1 && !stopWords.includes(w));
+  
+  // Try to find a city
+  const cities = ["kota", "jaipur", "delhi", "ahmedabad", "mumbai", "pune", "bangalore", "chennai", "kolkata", "noida", "gurgaon", "hyderabad", "surat"];
+  let location = "";
   for (const city of cities) {
     if (queryLower.includes(city)) {
-      detectedLocation = city.charAt(0).toUpperCase() + city.slice(1);
+      location = city.charAt(0).toUpperCase() + city.slice(1);
       break;
     }
   }
-
-  if (detectedLocation) {
-    location = detectedLocation;
-  } else {
-    // If no city matches, use default
-    location = "Rajasthan";
+  
+  if (!location) {
+    location = "India";
   }
 
-  // List of mock company name segments based on category
+  // Determine category/product keywords
+  let categoryKeyword = "";
+  if (words.length > 0) {
+    const nonLocationWords = words.filter(w => w !== location.toLowerCase());
+    if (nonLocationWords.length > 0) {
+      categoryKeyword = nonLocationWords.map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+    }
+  }
+  if (!categoryKeyword) {
+    categoryKeyword = "Industrial Goods";
+  }
+
+  const category = categoryKeyword;
+
   const supplierTemplates = [
     {
       nameSuffix: "Enterprises",
-      desc: "Leading manufacturer and wholesale distributor of heavy industrial products. Established in 2010 with state-of-the-art testing facilities.",
-      products: ["Heavy Duty Products", "Standard Materials", "Custom Fabrications", "OEM Services"]
+      desc: `Leading provider of ${category.toLowerCase()} and wholesale supply services. Established with certified logistics and top quality standards.`,
+      products: [`Premium ${category}`, `Commercial ${category}`, `Standard Grade Supplies`, `Custom Solutions`]
     },
     {
       nameSuffix: "Industries Ltd.",
-      desc: "ISO 9001:2015 certified company specializing in premium grade raw materials and fabrication services. Catering to national infrastructure projects.",
-      products: ["Premium Supplies", "Bulk Orders", "Structural Solutions", "Raw Elements"]
-    },
-    {
-      nameSuffix: "Steel & Alloys",
-      desc: "Top-tier supplier of metal castings, rolled products, and specialized reinforcements. Known for prompt delivery and strict quality compliance.",
-      products: ["Grade-A Reinforcements", "Custom Sections", "Alloy Components", "Bulk Logistics"]
-    },
-    {
-      nameSuffix: "Solutions Corp",
-      desc: "Pioneering technological integrations in manufacturing. Supplying high-durability items for residential and commercial development projects.",
-      products: ["Smart Materials", "Pre-fabricated Modules", "Eco-friendly Components", "Design Consultation"]
+      desc: `ISO 9001 certified manufacturer specializing in high-grade ${category.toLowerCase()} and components. Serving regional hubs.`,
+      products: [`Heavy-Duty ${category}`, `Industrial Grade ${category}`, `Bulk Materials`, `OEM Services`]
     },
     {
       nameSuffix: "Trading Company",
-      desc: "Authorized dealer and supply chain partner for leading global brands. Providing door-step delivery and competitive bulk pricing options.",
-      products: ["Branded Products", "Imported Alternates", "Ready Stock Supplies", "Wholesale Distribution"]
+      desc: `Authorized national distributor and supply chain partner. Offering door-step delivery and competitive bulk contract rates.`,
+      products: [`Branded ${category}`, `Bulk ${category} Orders`, `Imported Alternatives`, `Wholesale Distribution`]
+    },
+    {
+      nameSuffix: "Solutions Corp",
+      desc: `Pioneering high-durability products and smart engineering designs. Delivering eco-friendly materials and custom specifications.`,
+      products: [`Eco ${category}`, `Advanced ${category} Modules`, `Specialized Components`, `Engineering Consultation`]
+    },
+    {
+      nameSuffix: "Partners",
+      desc: `Dedicated supplier of premium ${category.toLowerCase()} for commercial, residential, and infrastructure projects across the region.`,
+      products: [`Grade-A ${category}`, `Contract Supplies`, `Ready-Stock Logistics`, `Local Distribution`]
     }
   ];
 
@@ -250,19 +299,9 @@ function generateMockSuppliers(query: string): SearchResult {
   const suppliers: Supplier[] = Array.from({ length: 30 }).map((_, idx) => {
     const tpl = supplierTemplates[idx % supplierTemplates.length];
     const prefix = brandPrefixes[idx % brandPrefixes.length];
-    const baseName = category.split(" ")[0] || "Industrial";
-    const name = `${prefix} ${location} ${baseName} ${tpl.nameSuffix}`;
+    const name = `${prefix} ${location} ${category} ${tpl.nameSuffix}`;
     const id = `mock-supplier-${idx + 1}`;
     
-    // Custom products list
-    const specificProducts = tpl.products.map(p => {
-      if (category.includes("TMT")) return p.replace("Products", "TMT Rebars").replace("Materials", "Fe-550D Bars").replace("Fabrications", "Structural Rods").replace("Supplies", "Stirrups");
-      if (category.includes("Cement")) return p.replace("Products", "OPC 53 Grade").replace("Materials", "PPC Cement").replace("Fabrications", "White Cement").replace("Supplies", "Rapid Hardening Cement");
-      if (category.includes("Pipe")) return p.replace("Products", "GI Pipes").replace("Materials", "MS Seamless Tubes").replace("Fabrications", "ERW Steel Pipes").replace("Supplies", "PVC Fittings");
-      if (category.includes("FRP")) return p.replace("Products", "Chemical Storage Tanks").replace("Materials", "Acid Storage FRP").replace("Fabrications", "Vertical FRP Vessels").replace("Supplies", "GRP Scrubbers");
-      return p;
-    });
-
     return {
       id,
       name,
@@ -270,7 +309,7 @@ function generateMockSuppliers(query: string): SearchResult {
       location: `${location}, India`,
       phone: `+91 98765 ${43210 - idx * 111}`,
       website: `https://www.${name.toLowerCase().replace(/[^a-z0-9]/g, "")}.com`,
-      products: specificProducts
+      products: tpl.products
     };
   });
 
