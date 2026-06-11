@@ -20,7 +20,8 @@ export default function SearchClient({ initialQuery }: SearchClientProps) {
   const [activeQuery, setActiveQuery] = useState(initialQuery);
   const [result, setResult] = useState<SearchResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
+  const [isLoading, setIsLoading] = useState(false);
+  const [isStreaming, setIsStreaming] = useState(false);
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
@@ -41,19 +42,84 @@ export default function SearchClient({ initialQuery }: SearchClientProps) {
       router.replace(`/search?${params.toString()}`, { scroll: false });
     }
 
-    startTransition(async () => {
-      setError(null);
-      setResult(null);
-      setActiveQuery(searchQuery);
-      setCurrentPage(1); // Reset page on new search
-      try {
-        const data = await searchSuppliers(searchQuery);
-        setResult(data);
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : "Unable to fetch supplier information. Please try again.";
-        setError(msg);
+    setIsLoading(true);
+    setIsStreaming(true);
+    setError(null);
+    setResult(null);
+    setActiveQuery(searchQuery);
+    setCurrentPage(1); // Reset page on new search
+
+    try {
+      const response = await fetch(`/api/search?q=${encodeURIComponent(searchQuery)}`);
+      if (!response.ok) {
+        throw new Error("Failed to initialize supplier discovery stream");
       }
-    });
+
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error("Streaming is not supported by your browser");
+      }
+
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        
+        let newlineIndex;
+        while ((newlineIndex = buffer.indexOf("\n")) !== -1) {
+          const line = buffer.substring(0, newlineIndex).trim();
+          buffer = buffer.substring(newlineIndex + 1);
+
+          if (line) {
+            try {
+              const packet = JSON.parse(line);
+              if (packet.type === "metadata") {
+                setResult({
+                  category: packet.data.category,
+                  location: packet.data.location,
+                  suppliers: []
+                });
+                setIsLoading(false); // Stop showing skeletons as soon as metadata arrives
+              } else if (packet.type === "supplier") {
+                const supplier = packet.data;
+                setResult(prev => {
+                  if (!prev) {
+                    return {
+                      category: "",
+                      location: "",
+                      suppliers: [supplier]
+                    };
+                  }
+                  // Prevent duplicate keys
+                  if (prev.suppliers.some(s => s.id === supplier.id)) {
+                    return prev;
+                  }
+                  return {
+                    ...prev,
+                    suppliers: [...prev.suppliers, supplier]
+                  };
+                });
+              } else if (packet.type === "done") {
+                break;
+              }
+            } catch (e) {
+              // Ignore partial/invalid lines
+            }
+          }
+        }
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Unable to fetch supplier information. Please try again.";
+      setError(msg);
+      setIsLoading(false);
+    } finally {
+      setIsStreaming(false);
+      setIsLoading(false);
+    }
   }, [router]);
 
   // Trigger search on mount if initialQuery is set (defer to avoid synchronous setState warning)
@@ -124,7 +190,7 @@ export default function SearchClient({ initialQuery }: SearchClientProps) {
           </div>
           <button
             type="submit"
-            disabled={isPending}
+            disabled={isLoading}
             className="rounded-xl bg-indigo-600 hover:bg-indigo-500 px-4 py-2.5 text-sm font-semibold text-white transition-all disabled:opacity-50 shrink-0"
           >
             Search
@@ -133,7 +199,7 @@ export default function SearchClient({ initialQuery }: SearchClientProps) {
       </div>
 
       {/* Loading Skeletons */}
-      {isPending && (
+      {isLoading && (
         <div className="flex flex-col flex-1">
           <div className="h-4 w-48 bg-slate-200 dark:bg-slate-800 rounded animate-pulse mb-6" />
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3 flex-1">
@@ -145,7 +211,7 @@ export default function SearchClient({ initialQuery }: SearchClientProps) {
       )}
 
       {/* Error state */}
-      {error && !isPending && (
+      {error && !isLoading && (
         <div className="flex flex-col flex-1 items-center justify-center py-16 text-center">
           <div className="flex h-14 w-14 items-center justify-center rounded-full bg-rose-50 text-rose-600 dark:bg-rose-950/30 dark:text-rose-400 mb-4">
             <AlertCircle className="h-7 w-7" />
@@ -165,7 +231,7 @@ export default function SearchClient({ initialQuery }: SearchClientProps) {
       )}
 
       {/* Search results display */}
-      {!isPending && !error && result && (
+      {!isLoading && !error && result && (
         <div className="flex flex-col flex-1">
           {/* Header result count */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
@@ -187,11 +253,19 @@ export default function SearchClient({ initialQuery }: SearchClientProps) {
               )}
             </div>
             
-            {/* Disclaimer badge */}
-            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 border border-amber-200/20 px-2.5 py-1 rounded-lg">
-              <AlertTriangle className="h-3.5 w-3.5" />
-              AI Synthesized Directory
-            </span>
+            {/* Stream and Disclaimer badges */}
+            <div className="flex items-center gap-2 flex-wrap">
+              {isStreaming && (
+                <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-200/20 px-2.5 py-1 rounded-lg animate-pulse">
+                  <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                  Discovering Suppliers ({result.suppliers.length}/30)
+                </span>
+              )}
+              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 border border-amber-200/20 px-2.5 py-1 rounded-lg">
+                <AlertTriangle className="h-3.5 w-3.5" />
+                AI Synthesized Directory
+              </span>
+            </div>
           </div>
 
           {/* Supplier Grid */}
