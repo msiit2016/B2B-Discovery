@@ -2,6 +2,9 @@ import { Metadata } from "next";
 import SearchClient from "./SearchClient";
 import { Suspense } from "react";
 
+// Force this route to always render on each request — never cache.
+export const dynamic = "force-dynamic";
+
 interface SearchPageProps {
   searchParams: Promise<{ q?: string }>;
 }

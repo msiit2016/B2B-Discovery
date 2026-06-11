@@ -2,6 +2,7 @@
 
 import OpenAI from "openai";
 import { GoogleGenAI } from "@google/genai";
+import { connection } from "next/server";
 
 export interface Supplier {
   id: string;
@@ -20,6 +21,10 @@ export interface SearchResult {
 }
 
 export async function searchSuppliers(query: string): Promise<SearchResult> {
+  // Force this server action to run at request time — never serve from cache.
+  // Per Next.js 16 docs, calling connection() opts out of static/cached execution.
+  await connection();
+
   const cleanQuery = query.trim();
   if (!cleanQuery) {
     return { category: "", location: "", suppliers: [] };
