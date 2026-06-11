@@ -34,7 +34,7 @@ export async function searchSuppliers(query: string): Promise<SearchResult> {
       console.log("Using Gemini API for B2B supplier discovery...");
       const ai = new GoogleGenAI({ apiKey: geminiApiKey });
       const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-1.5-flash",
         contents: `Act as a B2B supplier discovery engine.
 For the query below:
 ${cleanQuery}
@@ -83,16 +83,17 @@ Return exactly 30 suppliers. Make sure they have realistic names, descriptions, 
       return data;
     } catch (error) {
       console.error("Gemini API Search Error:", error);
-      if (!openaiApiKey) {
-        console.warn("No OpenAI key found. Unable to search with LLMs, falling back to mock.");
-      } else {
+      if (openaiApiKey && openaiApiKey !== "your_openai_api_key_here") {
         console.log("Gemini failed. Cascading down to OpenAI...");
+      } else {
+        console.warn("Gemini failed and no valid OpenAI key found. Falling back to mock data.");
       }
     }
   }
 
-  // 2. Try OpenAI API if configured
-  if (openaiApiKey) {
+  // 2. Try OpenAI API if configured and key is valid
+  const isValidOpenAIKey = openaiApiKey && openaiApiKey !== "your_openai_api_key_here";
+  if (isValidOpenAIKey) {
     try {
       console.log("Using OpenAI API for B2B supplier discovery...");
       const openai = new OpenAI({ apiKey: openaiApiKey });
@@ -158,7 +159,7 @@ Return 30 suppliers. Make sure they have realistic names, descriptions, location
       return data;
     } catch (error) {
       console.error("OpenAI API Search Error:", error);
-      throw new Error("Unable to fetch supplier information. Please try again.");
+      console.warn("OpenAI also failed. Falling back to mock data.");
     }
   }
 
